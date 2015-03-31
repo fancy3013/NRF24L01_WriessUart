@@ -1,0 +1,121 @@
+C51 COMPILER V9.52.0.0   ATCMD                                                             10/07/2014 21:27:14 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE ATCMD
+OBJECT MODULE PLACED IN ATCMD.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE ATCMD.C BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          /****************************************
+   2          AT指令解析引擎
+   3          at_scan函数用于监测AT开头,并存储一条AT数据,此例放到串口接收中断
+   4          at_cmp函数用于解析存储的AT数组,并执行相应命令
+   5          结构体部分位AT指令描述以及函数的对应关系
+   6          制作人:Fancy 
+   7          QQ:652774317
+   8          ******************************************/
+   9          #include  "ATCMD.H"
+  10          
+  11          
+  12          code  unsigned char at_head[AT_HEAD_LEN]={'A','T','+'}; //AT指令开头
+  13          unsigned char addr_cmp=0;   //AT指令开头校验位置
+  14          unsigned char at_addr=0;    //AT缓冲区最后一个数据位置
+  15          bit at_head_flag=0;     //检测AT指令开头标志位
+  16          unsigned char at_buf[AT_BUF_MAX]={0};
+  17          
+  18          
+  19          code  AT_STRUCT at_array[AT_CMD_COUNT]=
+  20          {
+  21            {"CH=",3,3,&AT_CH},
+  22            {"ACK=",4,2,&AT_ACK},
+  23            {"?=",2,0,&AT_SEND}
+  24          };
+  25          //监测AT开头并将AT命令存储到缓冲区
+  26          void  at_scan(void)
+  27          {
+  28   1          if(at_head_flag)
+  29   1            if(at_addr<AT_BUF_MAX)    at_buf[at_addr++]=SBUF;
+  30   1            
+  31   1            if(SBUF==at_head[addr_cmp])       addr_cmp++;
+  32   1            else  addr_cmp=0;
+  33   1            if(addr_cmp==AT_HEAD_LEN)
+  34   1              {
+  35   2                at_head_flag=1;
+  36   2                addr_cmp=0;
+  37   2                at_addr=0;
+  38   2              }
+  39   1            
+  40   1      }     
+  41          //比较两个字符串cont字节,相同为1,否则返回0      
+  42          unsigned char at_cmp(unsigned char *s,unsigned char count)  
+  43          {
+  44   1          unsigned char res;
+  45   1          for(res=0;res<count;res++)
+  46   1          {
+  47   2            if(*(s+res) !=  at_buf[res])    return  0;
+  48   2          }
+  49   1          return  1;  
+  50   1      }
+  51          //AT指令解析后并执行相应函数
+  52          void  AT_CMD(void)
+  53          {
+  54   1        unsigned char i;
+  55   1        if(at_head_flag)
+C51 COMPILER V9.52.0.0   ATCMD                                                             10/07/2014 21:27:14 PAGE 2   
+
+  56   1          {
+  57   2          for(i=0;i<AT_CMD_COUNT;i++)
+  58   2            {
+  59   3              if(at_addr  >=  (at_array[i].cmd_len+at_array[i].data_len))
+  60   3              {
+  61   4              if(at_cmp(at_array[i].s,at_array[i].cmd_len))
+  62   4                {
+  63   5                  at_head_flag=0;
+  64   5                  (*at_array[i].Subs)();
+  65   5                }
+  66   4              }
+  67   3            }
+  68   2          }
+  69   1      }
+  70          
+  71          void  AT_CH(void)
+  72          {
+  73   1        unsigned char chanel;
+  74   1        unsigned char point;
+  75   1        point=at_array[0].cmd_len;
+  76   1        chanel=(at_buf[point]-0x30)*100 + (at_buf[point+1]-0x30)*10 + (at_buf[point+2]-0x30);
+  77   1        NRF24L01_Change_Ch(chanel);
+  78   1      }
+  79          
+  80          void  AT_ACK(void)
+  81          {
+  82   1        unsigned char point;
+  83   1        point=at_array[1].cmd_len;
+  84   1        if(at_buf[point]  ==  '1')  NRF24L01_FLAG |= NRF24L01_AUTO_ACK;
+  85   1        if(at_buf[point]  ==  '0')  NRF24L01_FLAG &= ~NRF24L01_AUTO_ACK;
+  86   1      }
+  87          
+  88          void  AT_SEND(void)
+  89          {
+  90   1        if(NRF24L01_FLAG & NRF24L01_AUTO_ACK)   SendString("ACK");
+  91   1        else  SendString("NOACK");
+  92   1        SendString("CH=");
+  93   1        SendData(RF_CH/100+0x30);
+  94   1        SendData(RF_CH%100/10+0x30);
+  95   1        SendData(RF_CH%10+0x30);
+  96   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    386    ----
+   CONSTANT SIZE    =     49    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      9       4
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

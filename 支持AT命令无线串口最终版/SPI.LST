@@ -1,0 +1,73 @@
+C51 COMPILER V9.50a   SPI                                                                  04/15/2014 22:11:49 PAGE 1   
+
+
+C51 COMPILER V9.50a, COMPILATION OF MODULE SPI
+OBJECT MODULE PLACED IN SPI.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE SPI.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          #include  "SPI.H"
+   2          
+   3          void SPI_INIT()
+   4          {
+   5   1          //清除标志位和数据发送缓冲区
+   6   1          SPDAT = 0;
+   7   1          SPIF_CLEAR;
+   8   1          //配置SPI控制寄存器
+   9   1          SPCTL = SPI_SSIG_1
+  10   1                  |SPI_MSTR //主机模式
+  11   1                  |SPI_CLK_DIV_16;//时钟16分频
+  12   1          AUXR1 |=  SPI_0;//设置SPI管脚
+  13   1          SPI_ON;
+  14   1      }
+  15          
+  16          unsigned  char  SPI_WriteRead(unsigned char dat)
+  17          {
+  18   1      
+  19   1      //    SPI_SS=0;
+  20   1          SPDAT = dat;
+  21   1          while(~SPI_FLAG);
+  22   1      //    SPI_SS = 1;
+  23   1          dat=SPDAT;
+  24   1          SPIF_CLEAR;
+  25   1          return dat;
+  26   1      }
+  27          
+  28          void  SPI_Write(unsigned char dat)
+  29          {
+  30   1      //    SPI_SS=0;
+  31   1          SPDAT = dat;
+  32   1          while(~SPI_FLAG);
+  33   1          SPIF_CLEAR;
+  34   1      //    SPI_SS = 1;
+  35   1      }
+  36          
+  37          unsigned char SPI_Read()
+  38          {
+  39   1        unsigned char dat;
+  40   1      //    SPI_SS=0;
+  41   1          SPDAT = 0xff;
+  42   1          while(~SPI_FLAG);
+  43   1          SPIF_CLEAR;
+  44   1      //    SPI_SS = 1;
+  45   1          dat=SPDAT;
+  46   1          SPIF_CLEAR;
+  47   1          return dat;
+  48   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =     57    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+C51 COMPILER V9.50a   SPI                                                                  04/15/2014 22:11:49 PAGE 2   
+
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

@@ -1,0 +1,7 @@
+"main.obj",
+"uart.obj",
+"NRF24L01.obj",
+"delay.obj",
+"ATCMD.obj" 
+TO "project" 
+RAMSIZE(256) 

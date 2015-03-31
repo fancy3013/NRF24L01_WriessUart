@@ -1,0 +1,80 @@
+C51 COMPILER V9.52.0.0   MAIN                                                              10/07/2014 21:27:14 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE MAIN
+OBJECT MODULE PLACED IN main.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE main.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          #include  <STC/STC15F2K60S2.H>
+   2          #include "uart.h"
+   3          #include  "NRF24L01.H"
+   4          #include "delay.h"
+   5          #include  "ATCMD.H"
+   6          
+   7          void main()
+   8          {
+   9   1        SPI_Init();
+  10   1        NRF24L01_Init();
+  11   1        InitUART();
+  12   1        NRF24L01_Check();
+  13   1         if(~(NRF24L01_FLAG & NRF24L01_CHECK))
+  14   1         {
+  15   2            #if BK2423
+                    NRF24L01_CE=0;
+                    NRF24L01_Write_Reg(ACTIVATE_CMD, 0x73);
+                    NRF24L01_CE=1;
+                    #endif
+  20   2           NRF24L01_Check();
+  21   2         }
+  22   1        Timer0Init();
+  23   1       if(NRF24L01_FLAG & NRF24L01_CHECK)
+  24   1       {
+  25   2         RED=0;
+  26   2         delay_ms(200);
+  27   2         RED=1;
+  28   2       }
+  29   1       else
+  30   1       {
+  31   2         BLUE=0;
+  32   2         delay_ms(200);
+  33   2         BLUE=1;
+  34   2       }
+  35   1      
+  36   1        while(1)
+  37   1        {
+  38   2          AT_CMD();
+  39   2          
+  40   2          if(nrf_rxfifo.Value_Data)
+  41   2          {
+  42   3            SendData(NRF_RXFIFO_Read());
+  43   3          }
+  44   2          if(uart_buf.Value_Data>=32)
+  45   2          {
+  46   3            while(NRF24L01_FLAG & NRF24L01_BUSY);
+  47   3            NRF24L01_Sendfifo(32);
+  48   3          }
+  49   2          else  if(TF0  &&  (uart_buf.Value_Data>0))
+  50   2          {
+  51   3            while(NRF24L01_FLAG & NRF24L01_BUSY);
+  52   3            NRF24L01_Sendfifo(uart_buf.Value_Data);
+  53   3          }
+  54   2        }
+  55   1      }
+C51 COMPILER V9.52.0.0   MAIN                                                              10/07/2014 21:27:14 PAGE 2   
+
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    108    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =   ----    ----
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

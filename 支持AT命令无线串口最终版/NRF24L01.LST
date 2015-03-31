@@ -1,0 +1,384 @@
+C51 COMPILER V9.52.0.0   NRF24L01                                                          10/07/2014 21:27:14 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE NRF24L01
+OBJECT MODULE PLACED IN NRF24L01.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE NRF24L01.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          /****************************************
+   2          NRF24L01¿âº¯Êý
+   3          STC15F2K61S2ÒÑ²âÊÔOK
+   4          Ö§³Ö24L01+ºÍBK2423
+   5          Ö§³ÖACKºÍNOACK
+   6          Ö§³Ö·¢ËÍÍê×Ô¶¯ÇÐ»»µ½½ÓÊÕÄ£Ê½
+   7          ÖÐ¶Ï´¦ÀíÏûÏ¢
+   8          ÖÆ×÷ÈË:Fancy 
+   9          QQ:652774317
+  10          ******************************************/
+  11          
+  12          #include  <STC/STC15F2K60S2.H>
+  13          #include  "NRF24L01.H"
+  14          #include "uart.h"
+  15          
+  16          unsigned char RF_CH=0x40;   //RFÆµµÀ
+  17          unsigned char NRF24L01_FLAG=0;  //NRF24L01µ±Ç°×´Ì¬±êÖ¾
+  18                                          //DB7; 1½ÓÊÕÄ£Ê½      0·¢ÉäÄ£Ê½
+  19                                          //DB6; 1ÓÐÈÎÎñ        0¿ÕÏÐ
+  20                                          //DB5; 1·¢ËÍ³É¹¦      0·¢ËÍÊ§°Ü(ÅäºÏDB6¼ì²âÊÇ·ñ·¢ËÍ³É¹¦)
+  21                                          //DB4; 1NRFÕý³£Á¬½Ó   0 ¼ì²â²»µ½Á¬½Ó
+  22                                          //DB3; 1½ÓÊÕµ½Êý¾Ý°ü  0 »º³åÇøÎÞÊý¾Ý
+  23                                          //DB2; 1 ACKÄ£Ê½      0 NOACKÄ£Ê½
+  24                                          //DB1; 1·¢ËÍÍê×Ô¶¯½øÈë½ÓÊÕÄ£Ê½ 0¹Ø±Õ×Ô¶¯ÇÐ»»Ä£Ê½
+  25          unsigned char DYNPD_LEN=0;      //ÓÃÓÚ´æ·Å¶¯Ì¬Êý¾Ý°ü³¤¶È
+  26          unsigned char TX_ADDRESS[NRF24L01_ADR_LEN]= {0x12,0x34,0x56,0x78,0x90}; //±¾µØµØÖ·
+  27          unsigned char RX_ADDRESS[NRF24L01_ADR_LEN]= {0x12,0x34,0x56,0x78,0x90}; //½ÓÊÕµØÖ·
+  28          
+  29          
+  30          //Ïò´Ó»ú·¢ËÍÒ»¸ö×Ö½ÚÊý¾Ý²¢·µ»Ø½ÓÊÕÊý¾Ý
+  31          /**************************************************/
+  32          
+  33          unsigned  char SPI_WriteRead(unsigned char byte)
+  34          {
+  35   1        
+  36   1        SPSTAT |= 0Xc0; // Çå¸ßÁ½Î»£¬
+  37   1        SPDAT=byte;
+  38   1        while(!(SPSTAT&0X80));
+  39   1        return SPDAT;
+  40   1      }
+  41          
+  42          /**********************/
+  43          /* ³õÊ¼»¯Ó²¼þSPI¿Ú    */
+  44          /**********************/
+  45          void SPI_Init(void)
+  46          {
+  47   1        SPSTAT |= 0XC0; 
+  48   1        SPCTL = 0XD0; 
+  49   1      }
+  50          //Ð´NRF24L01¼Ä´æÆ÷£¬·µ»Ø×´Ì¬Öµ
+  51          unsigned char NRF24L01_Write_Reg(unsigned char reg, unsigned char value)
+  52          {
+  53   1         unsigned char BackDate;
+  54   1         SPI_SS=0;
+  55   1         SPI_WriteRead(reg);
+C51 COMPILER V9.52.0.0   NRF24L01                                                          10/07/2014 21:27:14 PAGE 2   
+
+  56   1         BackDate=SPI_WriteRead(value);
+  57   1         SPI_SS=1;
+  58   1         return(BackDate);
+  59   1      }
+  60          //¶ÁNRF24L01¼Ä´æÆ÷£¬·µ»Ø¼Ä´æÆ÷Öµ
+  61          unsigned char NRF24L01_Read_Reg(unsigned char reg)
+  62          {
+  63   1         unsigned char BackDate;
+  64   1         SPI_SS=0;
+  65   1         SPI_WriteRead(reg);
+  66   1         BackDate=SPI_WriteRead(0x00);
+  67   1         SPI_SS=1;
+  68   1         return(BackDate);
+  69   1      }
+  70          //¶ÁÈ¡»º³åÇøÊý¾Ý
+  71          void NRF24L01_Read_Buf(unsigned char reg, unsigned char *pBuf,unsigned char bytes)
+  72          {
+  73   1        unsigned char byte_ctr;
+  74   1        SPI_SS = 0;
+  75   1        SPI_WriteRead(reg);
+  76   1        for(byte_ctr=0;byte_ctr<bytes;byte_ctr++)
+  77   1        pBuf[byte_ctr] = SPI_WriteRead(0x00);
+  78   1        SPI_SS = 1;
+  79   1      }
+  80          //Ïò»º³åÇøÐ´ÈëÊý¾Ý
+  81          unsigned char NRF24L01_Write_Buf(unsigned char reg,unsigned char *pBuf,unsigned char bytes)
+  82          {
+  83   1        unsigned char status,byte_ctr;
+  84   1        SPI_SS = 0;
+  85   1        status = SPI_WriteRead(reg);
+  86   1        for(byte_ctr=0; byte_ctr<bytes; byte_ctr++) 
+  87   1        SPI_WriteRead(*pBuf++);
+  88   1        SPI_SS = 1; 
+  89   1        return(status);
+  90   1      }
+  91          
+  92          //NRF24L01³õÊ¼»¯º¯Êý
+  93          void NRF24L01_Init(void)
+  94          {
+  95   1        #if BK2423
+                NRF24L01_CE=0;
+                NRF24L01_Write_Reg(ACTIVATE_CMD, 0x73);
+                NRF24L01_CE=1;
+                #endif
+ 100   1        
+ 101   1        NRF24L01_CE=0;
+ 102   1        //ÅäÖÃ¼Ä´æÆ÷
+ 103   1        NRF24L01_FLAG |= NRF24L01_AUTO_ACK;   //ÊÇ·ñ¿ªÆôÓ¦´ðÄ£Ê½
+ 104   1        NRF24L01_FLAG |= NRF24L01_AUTO_RX;    //·¢ËÍÍêÊÇ·ñ×Ô¶¯½øÈë½ÓÊÕÄ£Ê½
+ 105   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_SETUP_AW, NRF24L01_ADR_LEN-2); //ÉèÖÃµØÖ·³¤¶ÈÎª NRF24L0
+             -1_ADR_LEN
+ 106   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_RF_CH,RF_CH);                  //ÉèÖÃRFÍ¨µÀÎªRFCH
+ 107   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_RF_SETUP, 0x27);               //ÉèÖÃTX·¢Éä²ÎÊý,7dbÔöÒæ
+             -,250kbps,µÍÔëÉùÔöÒæ¿ªÆô
+ 108   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_EN_AA, 0x01);                  //Ê¹ÄÜÍ¨µÀ0µÄ×Ô¶¯Ó¦´ð
+ 109   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_EN_RXADDR, 0x01);              //Ê¹ÄÜÍ¨µÀ0µÄ½ÓÊÕµØÖ·
+ 110   1        //RXÄ£Ê½ÅäÖÃ
+ 111   1        NRF24L01_Write_Buf(NRF24L01_WRITE_REG | NRF24L01_RX_ADDR_P0,RX_ADDRESS,NRF24L01_ADR_LEN); //Ð´RX½ÚµãµØÖ·
+ 112   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_FEATURE,0x05);                 //Ê¹ÄÜ¶¯Ì¬Êý¾Ý°ü³¤¶È,AUTO_ACKÄ£Ê
+             -½
+ 113   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_DYNPD,0X01);                   //Ñ¡ÔñÍ¨µÀ0¶¯Ì¬Êý¾Ý°ü³¤¶È
+ 114   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_FLUSE_RX,NRF24L01_NOP);                //Çå³ýRX FIFO¼Ä´
+C51 COMPILER V9.52.0.0   NRF24L01                                                          10/07/2014 21:27:14 PAGE 3   
+
+             -æÆ÷
+ 115   1        //TXÄ£Ê½ÅäÖÃ
+ 116   1        NRF24L01_Write_Buf(NRF24L01_WRITE_REG | NRF24L01_TX_ADDR ,TX_ADDRESS,NRF24L01_ADR_LEN); //Ð´TX½ÚµãµØÖ·
+ 117   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_SETUP_RETR, 0x1f);           //ÉèÖÃ×Ô¶¯ÖØ·¢¼ä¸ôÊ±¼ä:500
+             -us + 86us;×î´ó×Ô¶¯ÖØ·¢´ÎÊý:15´Î
+ 118   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_FLUSE_TX, NRF24L01_NOP);              //Çå³ýTX FIFO¼Ä´æ
+             -Æ÷
+ 119   1        NRF24L01_RxMode();                                                            //Ä¬ÈÏ½øÈë½ÓÊÕÄ£Ê½
+ 120   1        NRF24L01_CE=1;
+ 121   1        IT0=1;    //ÏÂ½µÑØÖÐ¶Ï
+ 122   1        EX0=1;    //¿ªÆôÍâ²¿ÖÐ¶Ï0
+ 123   1        EA=1;
+ 124   1      }
+ 125          
+ 126          //NRF24L01½øÈë·¢ËÍÄ£Ê½
+ 127          void NRF24L01_TxMode(void)
+ 128          {
+ 129   1        NRF24L01_CE=0;
+ 130   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_CONFIG, 0x0e);
+ 131   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_FLUSE_TX,NRF24L01_NOP);  //Çå³ýTX FIFO¼Ä´æÆ÷
+ 132   1        NRF24L01_CE = 1; 
+ 133   1        NRF24L01_FLAG &= ~NRF24L01_MODE_RX;   //ÐÞ¸Ä×´Ì¬±êÊ¶Îª·¢ÉäÄ£Ê½
+ 134   1        NRF24L01_FLAG &= ~NRF24L01_BUSY;  //BUSY±êÖ¾ÖÃ0
+ 135   1        NRF24L01_FLAG &= ~NRF24L01_RECIVE;//Çå³ýÓÐÊý¾Ý±êÖ¾
+ 136   1      }
+ 137          //NRF24L01½øÈë½ÓÊÕÄ£Ê½
+ 138          void NRF24L01_RxMode(void)
+ 139          {
+ 140   1        NRF24L01_CE=0;
+ 141   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_CONFIG, 0x0f);   //ÅäÖÃ»ù±¾¹¤×÷Ä£Ê½µÄ²ÎÊý;PWR_UP,EN_CRC,1
+             -6BIT_CRC,½ÓÊÕÄ£Ê½
+ 142   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_FLUSE_RX,NRF24L01_NOP);  //Çå³ýRX FIFO¼Ä´æÆ÷
+ 143   1        NRF24L01_CE = 1; 
+ 144   1        NRF24L01_FLAG |= NRF24L01_MODE_RX;    //ÐÞ¸Ä×´Ì¬±êÊ¶Îª½ÓÊÕÄ£Ê½
+ 145   1        NRF24L01_FLAG &= ~NRF24L01_BUSY;  //BUSY±êÖ¾ÖÃ0
+ 146   1        DYNPD_LEN=0;  //Çå0¶¯Ì¬Êý¾Ý°ü³¤¶È
+ 147   1        NRF24L01_FLAG &= ~NRF24L01_RECIVE;//Çå³ýÓÐÊý¾Ý±êÖ¾
+ 148   1      }
+ 149          
+ 150          //NRF24L01 SPIÍ¨ÐÅ¼ì²é
+ 151          void NRF24L01_Check(void)
+ 152          {
+ 153   1        unsigned char i=0;
+ 154   1        unsigned char Buff[5];
+ 155   1        NRF24L01_Read_Buf(NRF24L01_TX_ADDR,Buff,NRF24L01_ADR_LEN);
+ 156   1        i=NRF24L01_Read_Reg(NRF24L01_DYNPD);  //¶ÁÈ¡DYNPD¼à²âÊÇ·ñÕýÈ·Ð´Èë
+ 157   1        if(i==0x01)   //ÕâÀïÉèÖÃµÄÊÇ0x01,ÒªÓë³õÊ¼»¯µÄÖµÏà¶ÔÓ¦
+ 158   1        {
+ 159   2        for(i = 0; i < NRF24L01_ADR_LEN; i++)
+ 160   2          {
+ 161   3            
+ 162   3              if(Buff[i] == TX_ADDRESS[i])
+ 163   3              {
+ 164   4               NRF24L01_FLAG |= NRF24L01_CHECK;
+ 165   4              }
+ 166   3              else 
+ 167   3              {
+ 168   4                NRF24L01_FLAG &= ~NRF24L01_CHECK;
+ 169   4                break;
+ 170   4              }
+ 171   3          }
+ 172   2        }
+C51 COMPILER V9.52.0.0   NRF24L01                                                          10/07/2014 21:27:14 PAGE 4   
+
+ 173   1        else  NRF24L01_FLAG &= ~NRF24L01_CHECK;
+ 174   1      }
+ 175          
+ 176          ////NRF24L01·¢ËÍÊý¾Ý
+ 177          //void NRF24L01_SendFrame(unsigned char *temp,unsigned char len)
+ 178          //{
+ 179          //  if(NRF24L01_FLAG & NRF24L01_MODE_RX)
+ 180          //  {
+ 181          //    NRF24L01_TxMode();
+ 182          //  }
+ 183          //  NRF24L01_FLAG |= NRF24L01_BUSY; //BUSY±êÖ¾ÖÃ1
+ 184          //  NRF24L01_FLAG &= ~NRF24L01_TX_ACCESS;//Çå³ý·¢ËÍ³É¹¦±êÖ¾
+ 185          //  NRF24L01_CE = 0;
+ 186          //  if(NRF24L01_FLAG & NRF24L01_AUTO_ACK)
+ 187          //    {
+ 188          //      NRF24L01_Write_Buf(NRF24L01_WR_TX_PLOAD,temp,len);  //Ð´´ý·¢Êý¾Ý°ü,ÐèÒª»ØÓ¦
+ 189          //    }
+ 190          //  else
+ 191          //  {
+ 192          //    NRF24L01_Write_Buf(W_TX_PAYLOAD_NOACK_CMD,temp,len);  //Ð´´ý·¢Êý¾Ý°ü,ÎÞÐë»ØÓ¦
+ 193          //  }
+ 194          //  NRF24L01_CE = 1; 
+ 195          //}
+ 196          
+ 197          ////NRF24L01½ÓÊÕÊý¾Ý
+ 198          //void NRF24L01_RecvFrame(unsigned char *temp)
+ 199          //{
+ 200          //  DYNPD_LEN=NRF24L01_Read_Reg(R_RX_PL_WID_CMD);
+ 201          //  if(DYNPD_LEN>32)
+ 202          //  {
+ 203          //    NRF24L01_RxMode();  //ÖØÐÂ³õÊ¼»¯½ÓÊÕÄ£Ê½
+ 204          //  }
+ 205          //  else
+ 206          //  {
+ 207          //    NRF24L01_Read_Buf(NRF24L01_RD_RX_PLOAD,temp,DYNPD_LEN); //¶ÁÈ¡»º³åÇøÊý¾Ý
+ 208          //  }
+ 209          //  NRF24L01_FLAG &= ~NRF24L01_RECIVE;//Çå³ýÓÐÊý¾Ý±êÖ¾
+ 210          //}
+ 211          //¸ü¸ÄRF_CH
+ 212          void NRF24L01_Change_Ch(unsigned char ch)
+ 213          {
+ 214   1        NRF24L01_CE = 0;
+ 215   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_RF_CH,ch&0x7F);  //ÉèÖÃRFÆµµÀ
+ 216   1        RF_CH=ch&0x7F;          //Í¬²½ÉèÖÃµ½ÏµÍ³²ÎÊý
+ 217   1      }
+ 218          
+ 219          //NRF24L01ÖÐ¶Ï´¦Àí
+ 220          void NRF24L01_Handler(void)   interrupt 0 
+ 221          {
+ 222   1        unsigned char state;
+ 223   1        state=NRF24L01_Read_Reg(NRF24L01_STATUS);   //¶ÁNRF24L01×´Ì¬¼Ä´æÆ÷
+ 224   1        NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_STATUS,state);//Çå³ýÖÐ¶Ï
+ 225   1        //·¢ËÍ³É¹¦ÖÐ¶Ï
+ 226   1        if(state & NRF24L01_STATUS_TX_DS)
+ 227   1        {
+ 228   2          BLUE=0;
+ 229   2          NRF24L01_FLAG &= ~NRF24L01_BUSY;  //BUSY±êÖ¾ÖÃ0
+ 230   2          NRF24L01_FLAG |= NRF24L01_TX_ACCESS;//·¢ËÍ³É¹¦±êÖ¾ÖÃ1
+ 231   2          if(NRF24L01_FLAG & NRF24L01_AUTO_RX)
+ 232   2          {
+ 233   3            NRF24L01_RxMode();  //ÖØÐÂ³õÊ¼»¯½ÓÊÕÄ£Ê½
+ 234   3          }
+C51 COMPILER V9.52.0.0   NRF24L01                                                          10/07/2014 21:27:14 PAGE 5   
+
+ 235   2          BLUE=1;
+ 236   2        }
+ 237   1        //´ïµ½×î´óÖØ·¢´ÎÊýÖÐ¶Ï
+ 238   1        if(state & NRF24L01_STATUS_MAX_RT)
+ 239   1        {
+ 240   2          NRF24L01_Write_Reg(NRF24L01_WRITE_REG | NRF24L01_FLUSE_TX,NRF24L01_NOP);  //Çå³ýTX FIFO¼Ä´æÆ÷
+ 241   2          NRF24L01_FLAG &= ~NRF24L01_BUSY;  //BUSY±êÖ¾ÖÃ0
+ 242   2          NRF24L01_FLAG &= ~NRF24L01_TX_ACCESS;//·¢ËÍ³É¹¦±êÖ¾ÖÃ0
+ 243   2          if(NRF24L01_FLAG & NRF24L01_AUTO_RX)
+ 244   2          {
+ 245   3            NRF24L01_RxMode();  //ÖØÐÂ³õÊ¼»¯½ÓÊÕÄ£Ê½
+ 246   3          }
+ 247   2        }
+ 248   1        //½ÓÊÕµ½Êý¾ÝÖÐ¶Ï
+ 249   1        if(state & NRF24L01_STATUS_RX_DR)
+ 250   1        {
+ 251   2          RED=0;
+ 252   2          NRF24L01_FLAG |= NRF24L01_RECIVE; //½ÓÊÕµ½Êý¾Ý±êÖ¾Î»ÖÃ1
+ 253   2          NRF24L01_Recvfifo();
+ 254   2          RED=1;
+ 255   2        }
+ 256   1      }
+ 257          
+ 258          //»·ÐÎFIFO»º³åÇøÅäÖÃ
+ 259          unsigned char idata nrf_rxarray[NRF_RXFIFO_MAX];
+ 260          
+ 261          ST_NRF  nrf_rxfifo=
+ 262          {
+ 263            NRF_RXFIFO_MAX, //»º³åÇø³¤¶È
+ 264            nrf_rxarray,    //»º³åÇøÊ×µØÖ·
+ 265            0,            //ÓÐÐ§Êý¾Ý³¤¶È
+ 266            0             //ÆðÊ¼Êý¾ÝÎ»ÖÃ
+ 267          };
+ 268          
+ 269          unsigned char NRF_RXFIFO_Read(void)
+ 270          {
+ 271   1        unsigned char *addr;
+ 272   1        addr=nrf_rxfifo.P_buf + nrf_rxfifo.Buf_Start;
+ 273   1        if(nrf_rxfifo.Value_Data>0)
+ 274   1        {
+ 275   2        nrf_rxfifo.Value_Data--;
+ 276   2        nrf_rxfifo.Buf_Start++;
+ 277   2        if(nrf_rxfifo.Buf_Start >= nrf_rxfifo.Max_Date) nrf_rxfifo.Buf_Start=0;
+ 278   2        }
+ 279   1        return  *addr;
+ 280   1      }
+ 281          
+ 282          void  NRF_RXFIFO_Write(unsigned char temp)
+ 283          {
+ 284   1        unsigned char *addr;
+ 285   1        if(nrf_rxfifo.Value_Data<nrf_rxfifo.Max_Date)
+ 286   1        {
+ 287   2          if((nrf_rxfifo.Value_Data+nrf_rxfifo.Buf_Start)>=nrf_rxfifo.Max_Date) addr=nrf_rxfifo.P_buf+nrf_rxfifo.V
+             -alue_Data+nrf_rxfifo.Buf_Start-nrf_rxfifo.Max_Date;
+ 288   2          else  addr=nrf_rxfifo.P_buf+nrf_rxfifo.Value_Data+nrf_rxfifo.Buf_Start;
+ 289   2          *(addr)=temp;
+ 290   2          nrf_rxfifo.Value_Data++;
+ 291   2        }
+ 292   1      }
+ 293          //½ÓÊÕÊý¾Ýµ½FIFO
+ 294          void  NRF24L01_Recvfifo(void)
+ 295          {
+C51 COMPILER V9.52.0.0   NRF24L01                                                          10/07/2014 21:27:14 PAGE 6   
+
+ 296   1        unsigned  char  byte_ctr;
+ 297   1        DYNPD_LEN=NRF24L01_Read_Reg(R_RX_PL_WID_CMD);
+ 298   1        if(DYNPD_LEN>32)
+ 299   1        {
+ 300   2          NRF24L01_RxMode();  //ÖØÐÂ³õÊ¼»¯½ÓÊÕÄ£Ê½
+ 301   2        }
+ 302   1        else
+ 303   1        {
+ 304   2        SPI_SS = 0;
+ 305   2        SPI_WriteRead(NRF24L01_RD_RX_PLOAD);
+ 306   2        for(byte_ctr=0;byte_ctr<DYNPD_LEN;byte_ctr++)
+ 307   2        NRF_RXFIFO_Write(SPI_WriteRead(0x00));
+ 308   2        SPI_SS = 1;
+ 309   2        }
+ 310   1        NRF24L01_FLAG &= ~NRF24L01_RECIVE;//Çå³ýÓÐÊý¾Ý±êÖ¾
+ 311   1      }
+ 312          
+ 313          //NRF24L01·¢ËÍfifoÊý¾Ý
+ 314          void NRF24L01_Sendfifo(unsigned char len)
+ 315          {
+ 316   1        unsigned char byte_ctr;
+ 317   1        if(NRF24L01_FLAG & NRF24L01_MODE_RX)
+ 318   1        {
+ 319   2          NRF24L01_TxMode();
+ 320   2        }
+ 321   1        NRF24L01_FLAG |= NRF24L01_BUSY; //BUSY±êÖ¾ÖÃ1
+ 322   1        NRF24L01_FLAG &= ~NRF24L01_TX_ACCESS;//Çå³ý·¢ËÍ³É¹¦±êÖ¾
+ 323   1        NRF24L01_CE = 0;
+ 324   1        if(NRF24L01_FLAG & NRF24L01_AUTO_ACK)
+ 325   1          {
+ 326   2          //Ð´´ý·¢Êý¾Ý,ÐèÒª»ØÓ¦
+ 327   2          SPI_SS = 0;
+ 328   2          SPI_WriteRead(NRF24L01_WR_TX_PLOAD);
+ 329   2          for(byte_ctr=0; byte_ctr<len; byte_ctr++) 
+ 330   2          SPI_WriteRead(UART_BUF_Read());
+ 331   2          SPI_SS = 1; 
+ 332   2          }
+ 333   1        else
+ 334   1        {
+ 335   2          //Ð´´ý·¢Êý¾Ý°ü,ÎÞÐë»ØÓ¦
+ 336   2          SPI_SS = 0;
+ 337   2          SPI_WriteRead(W_TX_PAYLOAD_NOACK_CMD);
+ 338   2          for(byte_ctr=0; byte_ctr<len; byte_ctr++) 
+ 339   2          SPI_WriteRead(UART_BUF_Read());
+ 340   2          SPI_SS = 1; 
+ 341   2        }
+ 342   1        NRF24L01_CE = 1; 
+ 343   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    781    ----
+   CONSTANT SIZE    =   ----    ----
+   XDATA SIZE       =   ----    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =     19      21
+   IDATA SIZE       =    120    ----
+   BIT SIZE         =   ----    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)

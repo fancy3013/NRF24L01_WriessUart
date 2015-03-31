@@ -1,0 +1,139 @@
+C51 COMPILER V9.52.0.0   UART                                                              10/07/2014 21:27:14 PAGE 1   
+
+
+C51 COMPILER V9.52.0.0, COMPILATION OF MODULE UART
+OBJECT MODULE PLACED IN uart.OBJ
+COMPILER INVOKED BY: C:\Keil\C51\BIN\C51.EXE uart.c BROWSE DEBUG OBJECTEXTEND TABS(2)
+
+line level    source
+
+   1          #include "uart.h"
+   2          #include  "ATCMD.H"
+   3          
+   4          unsigned char xdata uart_array[UART_BUF_MAX];
+   5          bit data  UART_BUSY=0;  //串口发送忙标志位1=忙
+   6          
+   7          ST_UART uart_buf=
+   8          {
+   9            UART_BUF_MAX, //缓冲区长度
+  10            uart_array,     //缓冲区首地址
+  11            0,            //有效数据长度
+  12            0             //起始数据位置
+  13          };
+  14          
+  15          unsigned char UART_BUF_Read(void)
+  16          {
+  17   1        unsigned char *addr;
+  18   1        addr=uart_buf.P_buf + uart_buf.Buf_Start;
+  19   1        if(uart_buf.Value_Data>0)
+  20   1        {
+  21   2        uart_buf.Value_Data--;
+  22   2        uart_buf.Buf_Start++;
+  23   2        if(uart_buf.Buf_Start >= uart_buf.Max_Date) uart_buf.Buf_Start=0;
+  24   2        }
+  25   1        return  *addr;
+  26   1      }
+  27          
+  28          void  UART_BUF_Write(unsigned char temp)
+  29          {
+  30   1        unsigned char *addr;
+  31   1        if(uart_buf.Value_Data<uart_buf.Max_Date)
+  32   1        {
+  33   2          if((uart_buf.Value_Data+uart_buf.Buf_Start)>=uart_buf.Max_Date) addr=uart_buf.P_buf+uart_buf.Value_Data+
+             -uart_buf.Buf_Start-uart_buf.Max_Date;
+  34   2          else  addr=uart_buf.P_buf+uart_buf.Value_Data+uart_buf.Buf_Start;
+  35   2          *(addr)=temp;
+  36   2          uart_buf.Value_Data++;
+  37   2        }
+  38   1      }
+  39          
+  40          
+  41          /*----------------------------
+  42              UART1初始化
+  43          -----------------------------*/
+  44          void InitUART(void)
+  45          {
+  46   1        SCON = 0x50;
+  47   1        AUXR |= 0x04;
+  48   1        AUXR &= 0xFE;
+  49   1        TMOD &= 0x0F;
+  50   1        T2L = 0xDF;
+  51   1        T2H = 0xFF; 
+  52   1        AUXR |= 0x01;
+  53   1        AUXR |= 0x10;
+  54   1        ES = 1;
+C51 COMPILER V9.52.0.0   UART                                                              10/07/2014 21:27:14 PAGE 2   
+
+  55   1        PS=1;
+  56   1        EA = 1;
+  57   1      }
+  58          
+  59          
+  60          
+  61          /*----------------------------
+  62          UART 中断服务程序
+  63          -----------------------------*/
+  64          void Uart() interrupt 4 
+  65          {
+  66   1         if (RI)
+  67   1          {
+  68   2          RI = 0;                 //清除RI位
+  69   2          UART_BUF_Write(SBUF);
+  70   2            at_scan();
+  71   2            TH0 = TIMER0_H; 
+  72   2            TF0 = 0;
+  73   2          }
+  74   1        if(TI)
+  75   1          {
+  76   2          TI=0;
+  77   2          UART_BUSY=0;
+  78   2          }
+  79   1      }
+  80          
+  81          /*----------------------------
+  82          发送串口数据
+  83          ----------------------------*/
+  84          void SendData(unsigned char dat)
+  85          {
+  86   1          while (UART_BUSY);               //等待前面的数据发送完成
+  87   1          SBUF = dat;                 //写数据到UART数据寄存器
+  88   1          UART_BUSY=1;                //忙标志置1
+  89   1      }
+  90          
+  91          /*----------------------------
+  92          发送字符串
+  93          ----------------------------*/
+  94          void SendString(unsigned char *s)
+  95          {
+  96   1          while (*s)                  //检测字符串结束标志
+  97   1          {
+  98   2              SendData(*s++);         //发送当前字符
+  99   2          }
+ 100   1      }
+ 101          //定时器0初始化 用于5ms定时
+ 102          void Timer0Init(void)
+ 103          {
+ 104   1        AUXR &= 0x7F;   
+ 105   1        TMOD &= 0xF0; 
+ 106   1        TMOD |= 0x01;
+ 107   1        TL0 = TIMER0_L; 
+ 108   1        TH0 = TIMER0_H; 
+ 109   1        TF0 = 0;
+ 110   1        TR0 = 1;
+ 111   1      }
+
+
+MODULE INFORMATION:   STATIC OVERLAYABLE
+   CODE SIZE        =    309    ----
+   CONSTANT SIZE    =   ----    ----
+C51 COMPILER V9.52.0.0   UART                                                              10/07/2014 21:27:14 PAGE 3   
+
+   XDATA SIZE       =    250    ----
+   PDATA SIZE       =   ----    ----
+   DATA SIZE        =      6       7
+   IDATA SIZE       =   ----    ----
+   BIT SIZE         =      1    ----
+END OF MODULE INFORMATION.
+
+
+C51 COMPILATION COMPLETE.  0 WARNING(S),  0 ERROR(S)
